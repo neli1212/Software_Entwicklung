@@ -1,0 +1,9 @@
+torch
+torchvision
+transformers
+opencv-python
+pillow
+PySide6
+numpy
+matplotlib
+python-dotenv
