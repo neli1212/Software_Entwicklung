@@ -1,0 +1,7 @@
+# MUST IGNORE THESE
+ai_models/
+dist/
+build/
+*.spec
+__pycache__/
+.env
