@@ -5,12 +5,10 @@ from PIL import Image
 class BlipEngine:
     def __init__(self):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        print(f"🧠 Loading BLIP Search Engine on {self.device}...")
+        print(f"Loading BLIP Search Engine on {self.device}...")
         
         self.processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
-        # For description generation
         self.model_gen = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base").to(self.device)
-        # For vector similarity
         self.model_search = BlipForImageTextRetrieval.from_pretrained("Salesforce/blip-itm-base-coco").to(self.device)
 
     def get_image_features(self, pil_image):
@@ -22,7 +20,6 @@ class BlipEngine:
     def get_text_features(self, text_query):
         inputs = self.processor(text=text_query, return_tensors="pt").to(self.device)
         with torch.no_grad():
-            # Use text_encoder from Retrieval model
             feats = self.model_search.text_encoder(**inputs).last_hidden_state[:, 0, :]
         return feats
 

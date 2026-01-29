@@ -4,21 +4,18 @@ from PIL import Image
 from PySide6.QtCore import QThread, Signal
 from transformers import BlipProcessor, BlipForConditionalGeneration, BlipForImageTextRetrieval
 
-# GLOBAL CACHE AND LOCK
 _GLOBAL_ENGINE = {"processor": None, "model_gen": None, "model_ret": None}
-_ENGINE_LOCK = threading.Lock() # Prevents race conditions during initialization
+_ENGINE_LOCK = threading.Lock() 
 
 MODEL_PATH = os.path.join(os.getcwd(), "ai_models")
 
 def get_engine_safe(device_string):
     """Thread-safe global loader for the BLIP models."""
     global _GLOBAL_ENGINE
-    with _ENGINE_LOCK: # Only one thread can enter this block at a time
+    with _ENGINE_LOCK: 
         if _GLOBAL_ENGINE["processor"] is None:
             print(f"🚀 [AI] LOADING ENGINES FROM: {MODEL_PATH}")
             dev = torch.device(device_string)
-            
-            # Load models into global cache
             _GLOBAL_ENGINE["processor"] = BlipProcessor.from_pretrained("Salesforce/blip-itm-base-coco", cache_dir=MODEL_PATH)
             _GLOBAL_ENGINE["model_gen"] = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base", cache_dir=MODEL_PATH).to(dev)
             _GLOBAL_ENGINE["model_ret"] = BlipForImageTextRetrieval.from_pretrained("Salesforce/blip-itm-base-coco", cache_dir=MODEL_PATH).to(dev)
@@ -92,7 +89,6 @@ class AIWorker(QThread):
 
     def run(self):
         try:
-            # FIX: Capture device string immediately for safety
             device = str(self.worker_device_str)
             proc, model_gen, model_ret = get_engine_safe(device)
             

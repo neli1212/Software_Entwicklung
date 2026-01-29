@@ -226,7 +226,7 @@ class MainWindow(QMainWindow):
         side_layout.addWidget(self.loading_label)
 
         self.progress_loading = QProgressBar()
-        self.progress_loading.setRange(0, 0) # Indeterminate mode (bouncing)
+        self.progress_loading.setRange(0, 0) 
         self.progress_loading.setTextVisible(False)
         self.progress_loading.hide()
         side_layout.addWidget(self.progress_loading)
@@ -297,7 +297,7 @@ class MainWindow(QMainWindow):
             self.progress_loading.show()
             
             loader = ModelLoader()
-            self._active_threads.append(loader) # Keep reference
+            self._active_threads.append(loader) 
             loader.finished.connect(lambda: self.on_models_ready(loader))
             loader.start()
 
@@ -420,7 +420,6 @@ class MainWindow(QMainWindow):
             'mode': mode
         }
 
-        # FIX: Keep reference to the scan worker
         scan_worker = AIWorker(prompt, self.query_drop.all_paths[0] if self.query_drop.all_paths else None, targets, settings)
         self._active_threads.append(scan_worker)
         

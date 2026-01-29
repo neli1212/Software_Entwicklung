@@ -1,8 +1,6 @@
 import cv2
 import os
 from PIL import Image
-
-# Supported formats moved to global scope for easy access
 IMG_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".JPG", ".JPEG")
 VID_EXTS = (".mp4", ".avi", ".mkv", ".mov")
 
@@ -21,7 +19,7 @@ def collect_all_media(paths):
         elif os.path.isfile(p):
             if p.lower().endswith(IMG_EXTS) or p.lower().endswith(VID_EXTS):
                 final_list.append(p)
-    return list(set(final_list)) # Remove duplicates
+    return list(set(final_list)) 
 
 class MediaProcessor:
     def __init__(self):
