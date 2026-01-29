@@ -14,13 +14,13 @@ def get_engine_safe(device_string):
     global _GLOBAL_ENGINE
     with _ENGINE_LOCK: 
         if _GLOBAL_ENGINE["processor"] is None:
-            print(f"🚀 [AI] LOADING ENGINES FROM: {MODEL_PATH}")
+            print(f" [AI] LOADING ENGINES FROM: {MODEL_PATH}")
             dev = torch.device(device_string)
             _GLOBAL_ENGINE["processor"] = BlipProcessor.from_pretrained("Salesforce/blip-itm-base-coco", cache_dir=MODEL_PATH)
             _GLOBAL_ENGINE["model_gen"] = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base", cache_dir=MODEL_PATH).to(dev)
             _GLOBAL_ENGINE["model_ret"] = BlipForImageTextRetrieval.from_pretrained("Salesforce/blip-itm-base-coco", cache_dir=MODEL_PATH).to(dev)
             
-            print(f"✅ [AI] ENGINES READY ON {str(dev).upper()}")
+            print(f"[AI] ENGINES READY ON {str(dev).upper()}")
     return _GLOBAL_ENGINE["processor"], _GLOBAL_ENGINE["model_gen"], _GLOBAL_ENGINE["model_ret"]
 
 class ModelLoader(QThread):
@@ -33,7 +33,7 @@ class ModelLoader(QThread):
         try:
             get_engine_safe(self.target_dev)
         except Exception as e:
-            print(f"❌ [LOADER ERROR]: {e}")
+            print(f"[LOADER ERROR]: {e}")
         finally:
             self.finished.emit()
 
@@ -117,7 +117,7 @@ class AIWorker(QThread):
                 else:
                     self.process_img(path, model_gen, model_ret, proc, device)
         except Exception as e:
-            print(f"❌ [AI WORKER ERROR]: {e}")
+            print(f"[AI WORKER ERROR]: {e}")
         finally:
             self.finished.emit()
 
