@@ -136,26 +136,15 @@ class AIWorker(QThread):
         visual_sim = 0.0
         if self.visual_query_vec is not None:
             visual_sim = F.cosine_similarity(self.visual_query_vec, target_visual_vec).item()
-
-        # 1. Rohe KI-Ähnlichkeit (50% Text, 50% Bild)
         raw_sim = (max(0.0, text_sim) * 0.5) + (max(0.0, visual_sim) * 0.5)
-        
-        # --- NEUE SKALIERUNG ---
-        # Wir definieren das typische Grundrauschen (baseline) und den realistischen Spitzenwert (max_expected)
         baseline = 0.22
         max_expected = 0.65
-        
-        # Alles was unter oder gleich dem Grundrauschen ist, ist kein Treffer -> 0%
         if raw_sim <= baseline:
             return 0.0
-            
-        # Wir strecken den echten Bereich (0.22 bis 0.65) auf 0.0 bis 1.0 (0% bis 100%)
         adjusted_sim = (raw_sim - baseline) / (max_expected - baseline)
         
-        # Verhindern, dass Werte über 100% schießen, falls das Modell doch mal >0.65 ausgibt
         adjusted_sim = min(1.0, adjusted_sim)
         
-        # Eine sanfte Kurve anlegen, damit echte Treffer stabile hohe Werte zeigen
         final_score = adjusted_sim ** 0.8 
         
         return min(0.999, final_score)
