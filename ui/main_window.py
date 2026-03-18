@@ -6,11 +6,10 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QStackedWidget, QSpinBox, QDoubleSpinBox, QComboBox, QProgressBar)
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap, QColor
-
-from engine.ai_worker import AIWorker, ModelLoader
+from engine.ai_worker import AIWorker, ModelLoader, AVAILABLE_MODELS, check_model_downloaded, delete_local_model
 from ui.widgets import UniversalCard
 from engine.processor import collect_all_media
-
+from PySide6.QtCore import QTimer
 # --- STYLESHEETS ---
 DARK_THEME = """
     QMainWindow, QWidget { background-color: #0f0f0f; color: #e0e0e0; font-family: 'Segoe UI'; }
@@ -141,8 +140,11 @@ class MainWindow(QMainWindow):
         
         self._active_threads = []
         self.models_loaded = False
+        self.download_timer = QTimer(self)
+        self.download_timer.timeout.connect(self.update_download_progress)
         
         self.setup_ui()
+        self.refresh_model_ui() 
         self.setStyleSheet(DARK_THEME)
 
     def setup_ui(self):
@@ -166,8 +168,8 @@ class MainWindow(QMainWindow):
         side_layout.addWidget(self.query_drop)
 
         q_btns = QHBoxLayout()
-        self.btn_q_file = QPushButton("📄 + Image")
-        self.btn_q_clear = QPushButton("🗑 Clear")
+        self.btn_q_file = QPushButton("+ Image File")
+        self.btn_q_clear = QPushButton("Clear Image")
         q_btns.addWidget(self.btn_q_file); q_btns.addWidget(self.btn_q_clear)
         side_layout.addLayout(q_btns)
         
@@ -179,12 +181,12 @@ class MainWindow(QMainWindow):
         side_layout.addWidget(self.target_drop)
         
         t_btns = QHBoxLayout()
-        self.btn_f = QPushButton("📄 + Files")
-        self.btn_d = QPushButton("📁 + Folder")
+        self.btn_f = QPushButton("+ Add Files")
+        self.btn_d = QPushButton("+ Add Folder")
         t_btns.addWidget(self.btn_f); t_btns.addWidget(self.btn_d)
         side_layout.addLayout(t_btns)
         
-        self.btn_clear_all = QPushButton("🗑 Clear All Targets")
+        self.btn_clear_all = QPushButton("Clear All Targets")
         side_layout.addWidget(self.btn_clear_all)
 
         side_layout.addSpacing(15)
@@ -192,6 +194,16 @@ class MainWindow(QMainWindow):
         # 3. AI Settings
         side_layout.addWidget(QLabel("<b style='color:#ff9800'>3. AI SETTINGS</b>"))
         
+        side_layout.addWidget(QLabel("KI-Modell Version:"))
+        self.combo_ai_model = QComboBox()
+        self.combo_ai_model.currentIndexChanged.connect(self.on_model_selection_changed)
+        side_layout.addWidget(self.combo_ai_model)
+        
+        self.btn_delete_model = QPushButton("Delete Selected Model")
+        self.btn_delete_model.clicked.connect(self.delete_selected_model)
+        side_layout.addWidget(self.btn_delete_model)
+        side_layout.addSpacing(10)
+
         side_layout.addWidget(QLabel("Comparison Logic:"))
         self.combo_mode = QComboBox()
         self.combo_mode.addItems(["Keyword Match (Precise)", "Vector Space (Abstract)"])
@@ -220,7 +232,7 @@ class MainWindow(QMainWindow):
         side_layout.addStretch()
 
         # --- MODEL LOADER PROGRESS BAR ---
-        self.loading_label = QLabel("First Run: Downloading AI Models (~1GB)...")
+        self.loading_label = QLabel("Ready to start.")
         self.loading_label.setStyleSheet("color: #ff9800; font-weight: bold; font-size: 11px;")
         self.loading_label.hide()
         side_layout.addWidget(self.loading_label)
@@ -231,7 +243,7 @@ class MainWindow(QMainWindow):
         self.progress_loading.hide()
         side_layout.addWidget(self.progress_loading)
 
-        self.scan_btn = QPushButton("🚀 RUN GLOBAL AI SEARCH")
+        self.scan_btn = QPushButton("RUN GLOBAL AI SEARCH")
         self.scan_btn.setStyleSheet("background-color: #005fb8; height: 50px; font-weight: bold;")
         side_layout.addWidget(self.scan_btn)
 
@@ -260,12 +272,12 @@ class MainWindow(QMainWindow):
         bottom_bar.addWidget(self.lbl_status)
         bottom_bar.addStretch()
         
-        self.btn_theme = QPushButton("🌗 Theme")
+        self.btn_theme = QPushButton("Toggle Theme")
         self.btn_theme.setFixedWidth(100)
         self.btn_theme.clicked.connect(self.toggle_theme)
         bottom_bar.addWidget(self.btn_theme)
 
-        self.btn_toggle_view = QPushButton("Switch View ☷/▦")
+        self.btn_toggle_view = QPushButton("Switch View (List/Grid)")
         self.btn_toggle_view.setFixedWidth(150)
         self.btn_toggle_view.clicked.connect(self.toggle_view)
         bottom_bar.addWidget(self.btn_toggle_view)
@@ -287,16 +299,87 @@ class MainWindow(QMainWindow):
         self.scan_btn.clicked.connect(self.on_run_clicked)
         self.on_mode_changed()
 
+    def refresh_model_ui(self):
+        current_index = self.combo_ai_model.currentIndex()
+        self.combo_ai_model.blockSignals(True)
+        self.combo_ai_model.clear()
+        
+        for key in AVAILABLE_MODELS.keys():
+            is_downloaded = check_model_downloaded(key)
+            display_text = f"{key} (Ready)" if is_downloaded else f"{key} (Needs Download)"
+            self.combo_ai_model.addItem(display_text, userData=key)
+            
+        if 0 <= current_index < self.combo_ai_model.count():
+            self.combo_ai_model.setCurrentIndex(current_index)
+            
+        self.combo_ai_model.blockSignals(False)
+        self.on_model_selection_changed()
+
+    def on_model_selection_changed(self):
+        selected_key = self.combo_ai_model.currentData()
+        self.models_loaded = False 
+        self.scan_btn.setText("RUN GLOBAL AI SEARCH")
+        
+        if check_model_downloaded(selected_key):
+            self.btn_delete_model.setEnabled(True)
+            self.btn_delete_model.setStyleSheet("background-color: #d32f2f; color: white;")
+        else:
+            self.btn_delete_model.setEnabled(False)
+            self.btn_delete_model.setStyleSheet("background-color: #444; color: #888;")
+
+    def delete_selected_model(self):
+        selected_key = self.combo_ai_model.currentData()
+        reply = QMessageBox.question(self, 'Delete Model', 
+                                     f'Are you sure you want to delete the files for "{selected_key}"?',
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, 
+                                     QMessageBox.StandardButton.No)
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            if delete_local_model(selected_key):
+                QMessageBox.information(self, "Success", "Model deleted successfully.")
+                self.models_loaded = False
+            else:
+                QMessageBox.warning(self, "Error", "Error deleting model. It might be in use.")
+            self.refresh_model_ui()
+
+    def get_dir_size(self, path):
+        total_size = 0
+        if os.path.exists(path):
+            for dirpath, _, filenames in os.walk(path):
+                for f in filenames:
+                    fp = os.path.join(dirpath, f)
+                    if not os.path.islink(fp):
+                        try:
+                            total_size += os.path.getsize(fp)
+                        except:
+                            pass
+        return total_size
+
+    def update_download_progress(self):
+        selected_key = self.combo_ai_model.currentData()
+        if not selected_key:
+            return
+        folder_name = AVAILABLE_MODELS[selected_key]["folder"]
+        path = os.path.join(os.getcwd(), "ai_models", folder_name)
+        
+        size_bytes = self.get_dir_size(path)
+        size_mb = size_bytes / (1024 * 1024)
+        self.loading_label.setText(f"Downloading Model")
+
     def on_run_clicked(self):
+        selected_model_key = self.combo_ai_model.currentData()
         if self.models_loaded:
             self.start_live_scan()
         else:
             self.scan_btn.setEnabled(False)
             self.scan_btn.setText("INITIALIZING AI...")
+            self.loading_label.setText("Starting Download...")
             self.loading_label.show()
             self.progress_loading.show()
             
-            loader = ModelLoader()
+            self.download_timer.start(500)
+            
+            loader = ModelLoader(selected_model_key)
             self._active_threads.append(loader) 
             loader.finished.connect(lambda: self.on_models_ready(loader))
             loader.start()
@@ -304,10 +387,12 @@ class MainWindow(QMainWindow):
     def on_models_ready(self, loader):
         if loader in self._active_threads: self._active_threads.remove(loader)
         self.models_loaded = True
+        self.download_timer.stop()
         self.loading_label.hide()
         self.progress_loading.hide()
         self.scan_btn.setEnabled(True)
-        self.scan_btn.setText("🚀 RUN GLOBAL AI SEARCH")
+        self.scan_btn.setText("RUN GLOBAL AI SEARCH")
+        self.refresh_model_ui() 
         self.start_live_scan()
 
     def toggle_theme(self):
@@ -345,8 +430,7 @@ class MainWindow(QMainWindow):
         self.view_mode = "GALLERY" if self.view_mode == "LIST" else "LIST"
         if self.view_mode == "LIST": self.view_stack.setCurrentWidget(self.main_table)
         else: self.view_stack.setCurrentWidget(self.main_scroll)
-        icon = "▦" if self.view_mode == "LIST" else "☷"
-        self.btn_toggle_view.setText(f"Switch View {icon}")
+        self.btn_toggle_view.setText("Switch View")
 
     def wipe_data(self):
         self.main_table.setRowCount(0)
@@ -381,9 +465,11 @@ class MainWindow(QMainWindow):
     def run_instant_caption(self, paths):
         if not paths: return
         self.statusBar().showMessage("AI interpreting query image...")
-        settings = {'num_beams': 5, 'min_length': 20, 'length_penalty': 2.0, 'repetition_penalty': 1.2, 'mode': 'vector'}
         
-        # FIX: Keep reference to the worker
+        selected_model_key = self.combo_ai_model.currentData()
+        
+        settings = {'num_beams': 5, 'min_length': 20, 'length_penalty': 2.0, 'repetition_penalty': 1.2, 'mode': 'vector', 'model_key': selected_model_key}
+        
         worker = AIWorker("", paths[0], [], settings)
         self._active_threads.append(worker)
         
@@ -395,6 +481,8 @@ class MainWindow(QMainWindow):
         prompt = self.query_text.text()
         targets = [p for p in self.file_map.keys()]
         mode = "keyword" if self.combo_mode.currentIndex() == 0 else "vector"
+        
+        selected_model_key = self.combo_ai_model.currentData()
         
         if mode == "keyword" and not prompt:
              QMessageBox.warning(self, "Error", "In Keyword Mode, you MUST enter text!")
@@ -417,7 +505,8 @@ class MainWindow(QMainWindow):
             'min_length': self.spin_min_len.value(),
             'length_penalty': self.spin_len_pen.value(),
             'repetition_penalty': self.spin_rep_pen.value(),
-            'mode': mode
+            'mode': mode,
+            'model_key': selected_model_key
         }
 
         scan_worker = AIWorker(prompt, self.query_drop.all_paths[0] if self.query_drop.all_paths else None, targets, settings)

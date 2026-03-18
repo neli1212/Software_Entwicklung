@@ -27,7 +27,6 @@ class UniversalCard(QFrame):
         self.path = path
         self.setFixedWidth(240); self.setFixedHeight(320)
         
-        # State tracking
         self.is_dark = True
         self.score = 0.0
         self.is_hit = False
@@ -35,7 +34,6 @@ class UniversalCard(QFrame):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(5,5,5,5)
         
-        # Thumbnail
         self.thumb = QLabel()
         self.thumb.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.thumb.setFixedSize(225, 150)
@@ -49,7 +47,6 @@ class UniversalCard(QFrame):
             self.thumb.setStyleSheet("color: #555; font-weight: bold;")
         layout.addWidget(self.thumb)
 
-        # Meta Data
         self.meta_layout = QVBoxLayout()
         self.name_lbl = QLabel(os.path.basename(path))
         self.name_lbl.setWordWrap(False)
@@ -66,7 +63,6 @@ class UniversalCard(QFrame):
         layout.addLayout(self.meta_layout)
         layout.addStretch()
 
-        # Apply initial style
         self.apply_style()
 
     def set_processing(self):
@@ -81,7 +77,6 @@ class UniversalCard(QFrame):
         """Update data and decide if it's a HIT"""
         self.score = float(data['score'])
         
-        # DEFINITION OF A HIT: > 60%
         self.is_hit = self.score > 0.60
         
         timestamp = data.get('timestamp', "")
@@ -105,25 +100,23 @@ class UniversalCard(QFrame):
         1. Theme (Dark/Light)
         2. Status (Hit/Miss/Idle)
         """
-        # 1. Colors Setup
         if self.is_dark:
             bg_idle = "#222"
-            bg_hit = "#1b3320" # Dark Greenish
+            bg_hit = "#1b3320" 
             border_idle = "#333"
             border_hit = "#00c853"
             text_main = "white"
             text_sub = "#aaa"
             text_hit = "#00e676"
-        else: # Light Mode
+        else: 
             bg_idle = "#ffffff"
-            bg_hit = "#e8f5e9" # Light Greenish
+            bg_hit = "#e8f5e9" 
             border_idle = "#cccccc"
             border_hit = "#2e7d32"
             text_main = "#000000"
             text_sub = "#555"
             text_hit = "#1b5e20"
 
-        # 2. Logic
         if self.is_hit:
             style = f"QFrame {{ background-color: {bg_hit}; border: 3px solid {border_hit}; border-radius: 8px; }}"
             status_color = text_hit
