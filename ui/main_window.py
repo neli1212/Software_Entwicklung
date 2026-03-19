@@ -1,4 +1,8 @@
 import sys, os
+
+os.environ["QT_ENABLE_HIGHDPI_SCALING"] = "0"
+os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "0"
+
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QLineEdit, QPushButton, QLabel, QScrollArea, 
                              QTableWidget, QTableWidgetItem, QHeaderView, QFrame, 
@@ -10,6 +14,7 @@ from engine.ai_worker import AIWorker, ModelLoader, AVAILABLE_MODELS, check_mode
 from ui.widgets import UniversalCard
 from engine.processor import collect_all_media
 from PySide6.QtCore import QTimer
+
 # --- STYLESHEETS ---
 DARK_THEME = """
     QMainWindow, QWidget { background-color: #0f0f0f; color: #e0e0e0; font-family: 'Segoe UI'; }
@@ -131,7 +136,7 @@ class SmartDropZone(QFrame):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("AI Search Engine (Final v2.1)")
+        self.setWindowTitle("AI Search Engine (Final)")
         self.resize(1300, 950)
         self.setStatusBar(QStatusBar())
         self.view_mode = "LIST"
@@ -152,11 +157,16 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
         layout = QHBoxLayout(central)
 
-        # --- SIDEBAR ---
-        self.sidebar = QFrame()
-        self.sidebar.setFixedWidth(320)
-        self.sidebar.setStyleSheet("background-color: #151515; border-right: 1px solid #222;")
+        self.sidebar_scroll = QScrollArea()
+        self.sidebar_scroll.setMinimumWidth(300)
+        self.sidebar_scroll.setMaximumWidth(420)
+        self.sidebar_scroll.setWidgetResizable(True)
+        self.sidebar_scroll.setStyleSheet("QScrollArea { border: none; border-right: 1px solid #222; background-color: #151515; }")
+        
+        self.sidebar = QWidget()
+        self.sidebar.setStyleSheet("background-color: transparent;")
         side_layout = QVBoxLayout(self.sidebar)
+        self.sidebar_scroll.setWidget(self.sidebar)
 
         # 1. Query
         side_layout.addWidget(QLabel("<b style='color:#3d94ff'>1. AI PROMPT & IMAGE</b>"))
@@ -283,7 +293,7 @@ class MainWindow(QMainWindow):
         bottom_bar.addWidget(self.btn_toggle_view)
         
         self.content_layout.addLayout(bottom_bar)
-        layout.addWidget(self.sidebar)
+        layout.addWidget(self.sidebar_scroll)
         layout.addWidget(content)
 
         # --- CONNECTIONS ---
@@ -399,11 +409,11 @@ class MainWindow(QMainWindow):
         self.is_dark_mode = not self.is_dark_mode
         if self.is_dark_mode:
             self.setStyleSheet(DARK_THEME)
-            self.sidebar.setStyleSheet("background-color: #151515; border-right: 1px solid #222;")
+            self.sidebar_scroll.setStyleSheet("QScrollArea { border: none; border-right: 1px solid #222; background-color: #151515; }")
             self.btn_toggle_view.setStyleSheet("background-color: #444; color: white; border: 1px solid #666;")
         else:
             self.setStyleSheet(LIGHT_THEME)
-            self.sidebar.setStyleSheet("background-color: #f5f5f5; border-right: 1px solid #ccc;")
+            self.sidebar_scroll.setStyleSheet("QScrollArea { border: none; border-right: 1px solid #ccc; background-color: #f5f5f5; }")
             self.btn_toggle_view.setStyleSheet("background-color: #ffffff; color: #333; border: 1px solid #ccc;")
         
         self.query_drop.update_theme(self.is_dark_mode)
@@ -442,8 +452,8 @@ class MainWindow(QMainWindow):
     def add_files_to_view(self, paths):
         files = collect_all_media(paths)
         new_files = [f for f in files if f not in self.file_map]
-        self.target_drop.all_paths.extend(new_files)
-        self.target_drop.label.setText(f"{len(self.target_drop.all_paths)} files queued")
+        
+        self.target_drop.label.setText(f"{len(self.file_map) + len(new_files)} files queued")
         
         for p in new_files:
             row = self.main_table.rowCount()
@@ -461,6 +471,10 @@ class MainWindow(QMainWindow):
             count = len(self.file_map)
             self.gallery_layout.addWidget(card, count // 4, count % 4)
             self.file_map[p] = {'row': row, 'card': card}
+            card.show()
+            
+        self.gallery_container.adjustSize()
+        self.main_scroll.widget().updateGeometry()
 
     def run_instant_caption(self, paths):
         if not paths: return

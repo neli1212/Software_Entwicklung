@@ -1,4 +1,4 @@
-import torch, cv2, os, re, threading, shutil
+import torch, cv2, os, re, threading, shutil, sys
 import torch.nn.functional as F
 from PIL import Image
 from PySide6.QtCore import QThread, Signal
@@ -7,7 +7,21 @@ from transformers import BlipProcessor, BlipForConditionalGeneration, BlipForIma
 _GLOBAL_ENGINE = {"processor": None, "model_gen": None, "model_ret": None, "current_model": None}
 _ENGINE_LOCK = threading.Lock() 
 
-MODEL_PATH = os.path.join(os.getcwd(), "ai_models")
+def get_model_path():
+    """Findet den Modell-Ordner, egal ob als Python-Skript oder Windows-EXE."""
+    if hasattr(sys, '_MEIPASS'):
+        meipass_path = os.path.join(sys._MEIPASS, "ai_models")
+        if os.path.exists(meipass_path):
+            return meipass_path
+    
+    if getattr(sys, 'frozen', False):
+        base_dir = os.path.dirname(sys.executable)
+    else:
+        base_dir = os.path.abspath(".")
+        
+    return os.path.join(base_dir, "ai_models")
+
+MODEL_PATH = get_model_path()
 
 AVAILABLE_MODELS = {
     "Base ": {
