@@ -1,88 +1,30 @@
 name: Build Windows EXE
 
-on: [push]
+on:
+  push:
+    branches:
+      - main  # or the branch you want to trigger builds from
 
 jobs:
-
-  build-cpu:
-    runs-on: windows-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-
-      - name: Install Dependencies (CPU)
-        run: |
-          python -m pip install --upgrade pip
-          pip install torch torchvision
-          pip install transformers pillow opencv-python PySide6 pyinstaller
-
-      - name: Build CPU EXE
-        run: pyinstaller --noconfirm --onedir --windowed --name AISearchEngine-CPU --collect-all torch --collect-all transformers --collect-all huggingface_hub --collect-all cv2 main.py
-
-      - name: Zip CPU Build
-        run: 7z a AISearchEngine-CPU.zip ./dist/AISearchEngine-CPU/*
-
-      - name: Upload CPU Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: AISearchEngine-Windows-CPU
-          path: AISearchEngine-CPU.zip
-
-  build-cuda:
-    runs-on: windows-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-
-      - name: Install Dependencies (CUDA)
-        run: |
-          python -m pip install --upgrade pip
-          pip install transformers pillow opencv-python PySide6 pyinstaller
-          pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
-
-      - name: Build CUDA EXE
-        run: pyinstaller --noconfirm --onedir --windowed --name AISearchEngine-CUDA --collect-all torch --collect-all transformers --collect-all huggingface_hub --collect-all cv2 main.py
-
-      - name: Zip CUDA Build
-        run: 7z a AISearchEngine-CUDA.zip ./dist/AISearchEngine-CUDA/*
-
-      - name: Upload CUDA Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: AISearchEngine-Windows-CUDA
-          path: AISearchEngine-CUDA.zip
-
   release:
-    needs: [build-cpu, build-cuda]
     runs-on: windows-latest
-    steps:
-      - name: Download CPU Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: AISearchEngine-Windows-CPU
 
-      - name: Download CUDA Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: AISearchEngine-Windows-CUDA
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Optional: Build steps here (e.g., compile your EXE)
+      # - name: Build EXE
+      #   run: |
+      #     echo "Insert build commands here"
+      #     # e.g., msbuild, pyinstaller, etc.
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          token: ${{ secrets.GH_PAT }}
           tag_name: build-${{ github.run_number }}
           name: AISearchEngine Build ${{ github.run_number }}
           files: |
             AISearchEngine-CPU.zip
             AISearchEngine-CUDA.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
