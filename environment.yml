@@ -1,0 +1,23 @@
+name: software-entwicklung
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.12
+  - pip
+  - libgcc-ng
+  - libstdcxx-ng
+  - pip:
+      - PySide6
+      - PySide6-Essentials
+      - PySide6-Addons
+      - torch
+      - torchvision
+      - opencv-python
+      - numpy
+      - pillow
+      - transformers
+      - python-dotenv
+      - tqdm
+      - filelock
+      - packaging

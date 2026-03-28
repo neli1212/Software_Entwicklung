@@ -1,9 +1,12 @@
 name: Build Windows EXE
+
 on: [push]
 
 jobs:
-  build:
+
+  build-cpu:
     runs-on: windows-latest
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -11,24 +14,93 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.10"
 
-      - name: Install Dependencies
+      - name: Install Dependencies (CPU)
         run: |
           python -m pip install --upgrade pip
-          pip install torch torchvision transformers pillow opencv-python PySide6 pyinstaller
+          pip install torch torchvision
+          pip install transformers pillow opencv-python PySide6 pyinstaller
 
-      - name: Build with PyInstaller
+      - name: Build CPU EXE
         run: |
-          pyinstaller --noconfirm --onedir --windowed --name "AISearchEngine" `
-          --collect-all torch `
-          --collect-all transformers `
-          --collect-all cv2 `
-          --hidden-import=pytorch `
-          "main.py"
+          pyinstaller --noconfirm --onedir --windowed --name "AISearchEngine-CPU" ^
+          --collect-all torch ^
+          --collect-all transformers ^
+          --collect-all cv2 ^
+          main.py
 
-      - name: Upload Artifact
+      - name: Zip CPU Build
+        run: |
+          powershell Compress-Archive dist/AISearchEngine-CPU AISearchEngine-CPU.zip
+
+      - name: Upload CPU Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AISearchEngine-Windows
-          path: dist/AISearchEngine/
+          name: AISearchEngine-Windows-CPU
+          path: AISearchEngine-CPU.zip
+
+
+  build-cuda:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install Dependencies (CUDA)
+        run: |
+          python -m pip install --upgrade pip
+          pip install torchvision
+          pip install transformers pillow opencv-python PySide6 pyinstaller
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+
+      - name: Build CUDA EXE
+        run: |
+          pyinstaller --noconfirm --onedir --windowed --name "AISearchEngine-CUDA" ^
+          --collect-all torch ^
+          --collect-all transformers ^
+          --collect-all cv2 ^
+          main.py
+
+      - name: Zip CUDA Build
+        run: |
+          powershell Compress-Archive dist/AISearchEngine-CUDA AISearchEngine-CUDA.zip
+
+      - name: Upload CUDA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AISearchEngine-Windows-CUDA
+          path: AISearchEngine-CUDA.zip
+
+
+  release:
+    needs: [build-cpu, build-cuda]
+    runs-on: windows-latest
+
+    steps:
+      - name: Download CPU Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: AISearchEngine-Windows-CPU
+
+      - name: Download CUDA Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: AISearchEngine-Windows-CUDA
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: AISearchEngine Build ${{ github.run_number }}
+          files: |
+            AISearchEngine-CPU.zip
+            AISearchEngine-CUDA.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
