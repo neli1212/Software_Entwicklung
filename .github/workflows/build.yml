@@ -23,16 +23,10 @@ jobs:
           pip install transformers pillow opencv-python PySide6 pyinstaller
 
       - name: Build CPU EXE
-        run: |
-          pyinstaller --noconfirm --onedir --windowed --name "AISearchEngine-CPU" ^
-          --collect-all torch ^
-          --collect-all transformers ^
-          --collect-all cv2 ^
-          main.py
+        run: pyinstaller --noconfirm --onedir --windowed --name AISearchEngine-CPU --collect-all torch --collect-all transformers --collect-all huggingface_hub --collect-all cv2 main.py
 
       - name: Zip CPU Build
-        run: |
-          powershell Compress-Archive dist/AISearchEngine-CPU AISearchEngine-CPU.zip
+        run: powershell Compress-Archive dist/AISearchEngine-CPU AISearchEngine-CPU.zip
 
       - name: Upload CPU Artifact
         uses: actions/upload-artifact@v4
@@ -61,16 +55,10 @@ jobs:
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
       - name: Build CUDA EXE
-        run: |
-          pyinstaller --noconfirm --onedir --windowed --name "AISearchEngine-CUDA" ^
-          --collect-all torch ^
-          --collect-all transformers ^
-          --collect-all cv2 ^
-          main.py
+        run: pyinstaller --noconfirm --onedir --windowed --name AISearchEngine-CUDA --collect-all torch --collect-all transformers --collect-all huggingface_hub --collect-all cv2 main.py
 
       - name: Zip CUDA Build
-        run: |
-          powershell Compress-Archive dist/AISearchEngine-CUDA AISearchEngine-CUDA.zip
+        run: powershell Compress-Archive dist/AISearchEngine-CUDA AISearchEngine-CUDA.zip
 
       - name: Upload CUDA Artifact
         uses: actions/upload-artifact@v4
