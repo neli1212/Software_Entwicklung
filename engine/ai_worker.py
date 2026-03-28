@@ -9,11 +9,16 @@ transformers_logging.set_verbosity_error()
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 if sys.platform == "win32":
-    sys.stdout.reconfigure(line_buffering=True)
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, 'w')
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, 'w')
+    try:
+        sys.stdout.reconfigure(line_buffering=True)
+    except (AttributeError, RuntimeError):
+        pass
 
-_GLOBAL_ENGINE = {"processor": None, "model_gen": None, "model_ret": None, "current_model": None}
-_ENGINE_LOCK = threading.Lock() 
-
+        
 def get_model_path():
     """Findet den Modell-Ordner, egal ob als Python-Skript oder Windows-EXE."""
     if hasattr(sys, '_MEIPASS'):
@@ -76,7 +81,7 @@ def get_engine_safe(device_string, model_key):
     global _GLOBAL_ENGINE
     with _ENGINE_LOCK: 
         if _GLOBAL_ENGINE["processor"] is None or _GLOBAL_ENGINE.get("current_model") != model_key:
-            print(f" [AI] LADE MODELL '{model_key}' VON: {MODEL_PATH}")
+            print(f"DEBUG: LADE MODELL '{model_key}' VON: {MODEL_PATH}")
             dev = torch.device(device_string)
       
             _GLOBAL_ENGINE["processor"] = None
@@ -92,8 +97,8 @@ def get_engine_safe(device_string, model_key):
             _GLOBAL_ENGINE["model_gen"] = BlipForConditionalGeneration.from_pretrained(m_info["cap"], cache_dir=specific_cache_dir).to(dev)
             _GLOBAL_ENGINE["model_ret"] = BlipForImageTextRetrieval.from_pretrained(m_info["ret"], cache_dir=specific_cache_dir).to(dev)
             _GLOBAL_ENGINE["current_model"] = model_key
-            
-            print(f"[AI] ENGINES BEREIT AUF {str(dev).upper()}")
+     
+            print(f"DEBUG: ENGINES BEREIT AUF {str(dev).upper()}")
     return _GLOBAL_ENGINE["processor"], _GLOBAL_ENGINE["model_gen"], _GLOBAL_ENGINE["model_ret"]
 
 class ModelLoader(QThread):
