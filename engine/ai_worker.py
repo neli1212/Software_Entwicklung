@@ -5,8 +5,17 @@ from PySide6.QtCore import QThread, Signal
 from transformers import BlipProcessor, BlipForConditionalGeneration, BlipForImageTextRetrieval
 from transformers import logging as transformers_logging
 
+
+_ENGINE_LOCK = threading.Lock()
+_GLOBAL_ENGINE = {
+    "processor": None,
+    "model_gen": None,
+    "model_ret": None,
+    "current_model": None
+}
+
 transformers_logging.set_verbosity_error()
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 
 if sys.platform == "win32":
     if sys.stdout is None:
@@ -18,9 +27,8 @@ if sys.platform == "win32":
     except (AttributeError, RuntimeError):
         pass
 
-        
 def get_model_path():
-    """Findet den Modell-Ordner, egal ob als Python-Skript oder Windows-EXE."""
+    """Finds the model folder safely in both standard Python and PyInstaller EXE environments."""
     if hasattr(sys, '_MEIPASS'):
         meipass_path = os.path.join(sys._MEIPASS, "ai_models")
         if os.path.exists(meipass_path):
@@ -49,13 +57,11 @@ AVAILABLE_MODELS = {
 }
 
 def check_model_downloaded(model_key):
-    """Prüft, ob der Ordner für das Modell existiert und Daten enthält."""
     if model_key not in AVAILABLE_MODELS: return False
     folder_path = os.path.join(MODEL_PATH, AVAILABLE_MODELS[model_key]["folder"])
     return os.path.exists(folder_path) and len(os.listdir(folder_path)) > 0
 
 def delete_local_model(model_key):
-    """Löscht die Dateien eines Modells, um Festplattenspeicher freizugeben."""
     global _GLOBAL_ENGINE
     if model_key not in AVAILABLE_MODELS: return False
     folder_path = os.path.join(MODEL_PATH, AVAILABLE_MODELS[model_key]["folder"])
@@ -77,11 +83,9 @@ def delete_local_model(model_key):
     return True
 
 def get_engine_safe(device_string, model_key):
-    """Lädt das spezifisch ausgewählte KI-Modell."""
     global _GLOBAL_ENGINE
     with _ENGINE_LOCK: 
         if _GLOBAL_ENGINE["processor"] is None or _GLOBAL_ENGINE.get("current_model") != model_key:
-            print(f"DEBUG: LADE MODELL '{model_key}' VON: {MODEL_PATH}")
             dev = torch.device(device_string)
       
             _GLOBAL_ENGINE["processor"] = None
@@ -98,7 +102,6 @@ def get_engine_safe(device_string, model_key):
             _GLOBAL_ENGINE["model_ret"] = BlipForImageTextRetrieval.from_pretrained(m_info["ret"], cache_dir=specific_cache_dir).to(dev)
             _GLOBAL_ENGINE["current_model"] = model_key
      
-            print(f"DEBUG: ENGINES BEREIT AUF {str(dev).upper()}")
     return _GLOBAL_ENGINE["processor"], _GLOBAL_ENGINE["model_gen"], _GLOBAL_ENGINE["model_ret"]
 
 class ModelLoader(QThread):
@@ -170,10 +173,7 @@ class AIWorker(QThread):
         adjusted_sim = (raw_sim - baseline) / (max_expected - baseline)
         
         adjusted_sim = min(1.0, adjusted_sim)
-        
-        final_score = adjusted_sim ** 0.8 
-        
-        return min(0.999, final_score)
+        return min(0.999, adjusted_sim ** 0.8)
 
     def generate_caption(self, model, inputs, proc, is_video=False):
         num_beams = self.settings.get('num_beams', 5)
@@ -236,7 +236,6 @@ class AIWorker(QThread):
             if fps == 0 or fps != fps: 
                 fps = 25.0
             
-
             interval_sec = 2 
             frame_skip = int(fps * interval_sec)
             if frame_skip == 0:
@@ -247,7 +246,6 @@ class AIWorker(QThread):
             
             frame_idx = 0
             while True:
-
                 cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
                 success, frame = cap.read()
                 
@@ -258,9 +256,8 @@ class AIWorker(QThread):
                 pil_img = Image.fromarray(frame_rgb)
                 inputs = proc(images=pil_img, return_tensors="pt").to(device)
                 
-                caption = self.generate_caption(model_gen, inputs, proc)
-                
                 with torch.no_grad():
+                    caption = self.generate_caption(model_gen, inputs, proc)
                     target_vec = F.normalize(model_ret.vision_proj(model_ret.vision_model(inputs.pixel_values).last_hidden_state[:, 0, :]), p=2, dim=-1)
                 
                 if self.mode == 'keyword':
