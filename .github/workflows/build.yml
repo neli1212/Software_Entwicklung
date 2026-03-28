@@ -6,7 +6,6 @@ jobs:
 
   build-cpu:
     runs-on: windows-latest
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -26,7 +25,7 @@ jobs:
         run: pyinstaller --noconfirm --onedir --windowed --name AISearchEngine-CPU --collect-all torch --collect-all transformers --collect-all huggingface_hub --collect-all cv2 main.py
 
       - name: Zip CPU Build
-        run: powershell Compress-Archive dist/AISearchEngine-CPU AISearchEngine-CPU.zip
+        run: 7z a AISearchEngine-CPU.zip ./dist/AISearchEngine-CPU/*
 
       - name: Upload CPU Artifact
         uses: actions/upload-artifact@v4
@@ -34,10 +33,8 @@ jobs:
           name: AISearchEngine-Windows-CPU
           path: AISearchEngine-CPU.zip
 
-
   build-cuda:
     runs-on: windows-latest
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -50,7 +47,6 @@ jobs:
       - name: Install Dependencies (CUDA)
         run: |
           python -m pip install --upgrade pip
-          pip install torchvision
           pip install transformers pillow opencv-python PySide6 pyinstaller
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
@@ -58,7 +54,7 @@ jobs:
         run: pyinstaller --noconfirm --onedir --windowed --name AISearchEngine-CUDA --collect-all torch --collect-all transformers --collect-all huggingface_hub --collect-all cv2 main.py
 
       - name: Zip CUDA Build
-        run: powershell Compress-Archive dist/AISearchEngine-CUDA AISearchEngine-CUDA.zip
+        run: 7z a AISearchEngine-CUDA.zip ./dist/AISearchEngine-CUDA/*
 
       - name: Upload CUDA Artifact
         uses: actions/upload-artifact@v4
@@ -66,11 +62,9 @@ jobs:
           name: AISearchEngine-Windows-CUDA
           path: AISearchEngine-CUDA.zip
 
-
   release:
     needs: [build-cpu, build-cuda]
     runs-on: windows-latest
-
     steps:
       - name: Download CPU Artifact
         uses: actions/download-artifact@v4
@@ -91,4 +85,4 @@ jobs:
             AISearchEngine-CPU.zip
             AISearchEngine-CUDA.zip
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
