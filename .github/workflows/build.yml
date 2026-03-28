@@ -4,6 +4,7 @@ on: [push]
 
 jobs:
 
+  # ---------- CPU‑Build ----------
   build-cpu:
     runs-on: windows-latest
     steps:
@@ -22,10 +23,10 @@ jobs:
           pip install transformers pillow opencv-python PySide6 pyinstaller
 
       - name: Build CPU EXE
-        run: pyinstaller --noconfirm --onefile --windowed --name AISearchEngine-CPU --collect-all torch --collect-all transformers --collect-all huggingface_hub --collect-all cv2 main.py
+        run: pyinstaller --noconfirm --onedir --windowed --name AISearchEngine-CPU --collect-all torch --collect-all transformers --collect-all huggingface_hub --collect-all cv2 main.py
 
       - name: Zip CPU Build
-        run: 7z a -mx9 AISearchEngine-CPU.zip ./dist/AISearchEngine-CPU.exe
+        run: 7z a AISearchEngine-CPU.zip ./dist/AISearchEngine-CPU/*
 
       - name: Upload CPU Artifact
         uses: actions/upload-artifact@v4
@@ -33,6 +34,7 @@ jobs:
           name: AISearchEngine-Windows-CPU
           path: AISearchEngine-CPU.zip
 
+  # ---------- CUDA‑Build & Aufteilen ----------
   build-cuda:
     runs-on: windows-latest
     steps:
@@ -51,30 +53,117 @@ jobs:
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
       - name: Build CUDA EXE
-        run: pyinstaller --noconfirm --onefile --windowed --name AISearchEngine-CUDA --collect-all torch --collect-all transformers --collect-all huggingface_hub --collect-all cv2 --exclude-module tkinter --exclude-module pandas --exclude-module numpy.distutils --strip main.py
+        run: pyinstaller --noconfirm --onedir --windowed --name AISearchEngine-CUDA --collect-all torch --collect-all transformers --collect-all huggingface_hub --collect-all cv2 main.py
 
       - name: Zip CUDA Build
-        run: 7z a -mx9 AISearchEngine-CUDA.zip ./dist/AISearchEngine-CUDA.exe
+        run: 7z a AISearchEngine-CUDA.zip ./dist/AISearchEngine-CUDA/*
 
-      - name: Upload CUDA Artifact
+      - name: Split CUDA ZIP into ≤2 GB parts
+        run: |
+          7z a -v2g AISearchEngine-CUDA.7z AISearchEngine-CUDA.zip
+          del AISearchEngine-CUDA.zip
+          # Erzeugt: AISearchEngine-CUDA.7z.001, .002, ...
+
+      - name: Upload split parts as artifact
         uses: actions/upload-artifact@v4
         with:
           name: AISearchEngine-Windows-CUDA
-          path: AISearchEngine-CUDA.zip
+          path: AISearchEngine-CUDA.7z.*
 
-  release:
-    needs: [build-cpu, build-cuda]
+  # ---------- Setup‑Installer (selbstextrahierende EXE) ----------
+  create-setup:
+    needs: [build-cuda]
     runs-on: windows-latest
     steps:
-      - name: Download CPU Artifact
+      - name: Download split parts
+        uses: actions/download-artifact@v4
+        with:
+          name: AISearchEngine-Windows-CUDA
+
+      - name: Generate download script (batch)
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $repo = "${{ github.repository }}"
+          $parts = Get-ChildItem -Name "AISearchEngine-CUDA.7z.*"
+          $urls = $parts | ForEach-Object { "https://github.com/${repo}/releases/download/${tag}/$_" }
+          $urlList = $urls -join "`n"
+
+          @"
+          @echo off
+          echo Downloading CUDA parts from GitHub...
+          setlocal enabledelayedexpansion
+          for /f "usebackq delims=" %%u in (`echo "$urlList"`) do (
+            echo Downloading %%u
+            curl -L -O "%%u"
+          )
+          echo Merging parts...
+          copy /b AISearchEngine-CUDA.7z.* AISearchEngine-CUDA.7z
+          echo Extracting...
+          7z x AISearchEngine-CUDA.7z -y
+          echo Cleanup...
+          del AISearchEngine-CUDA.7z.* AISearchEngine-CUDA.7z
+          echo Done. Press any key to exit.
+          pause >nul
+          "@ > "AISearchEngine-CUDA-Setup.bat"
+
+      - name: Convert batch to silent EXE (IExpress)
+        run: |
+          $sed = @"
+          [Version]
+          Class=IEXPRESS
+          SEDVersion=3
+          [Options]
+          PackagePurpose=InstallApp
+          ShowInstallProgramWindow=1
+          HideExtractAnimation=1
+          UseLongFileName=1
+          InsideCompressed=0
+          CAB_FixedSize=0
+          CAB_ResvCodeSigning=0
+          RebootMode=N
+          InstallPrompt=
+          DisplayLicense=
+          FinishMessage=Fertig.
+          TargetName=AISearchEngine-CUDA-Setup.exe
+          FriendlyName=AISearchEngine CUDA Setup
+          AppLaunched=AISearchEngine-CUDA-Setup.bat
+          PostInstallCmd=
+          AdminQuietInstCmd=
+          UserQuietInstCmd=
+          SourceFiles=SourceFiles
+          [SourceFiles]
+          SourceFiles0=.
+          [SourceFiles0]
+          AISearchEngine-CUDA-Setup.bat=
+          "@
+          $sed | Out-File -Encoding ascii setup.sed
+          iexpress /n setup.sed
+
+      - name: Upload Setup EXE as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AISearchEngine-Windows-CUDA-Setup
+          path: AISearchEngine-CUDA-Setup.exe
+
+  # ---------- Release ----------
+  release:
+    needs: [build-cpu, create-setup]
+    runs-on: windows-latest
+    steps:
+      - name: Download CPU artifact
         uses: actions/download-artifact@v4
         with:
           name: AISearchEngine-Windows-CPU
 
-      - name: Download CUDA Artifact
+      - name: Download CUDA split parts
         uses: actions/download-artifact@v4
         with:
           name: AISearchEngine-Windows-CUDA
+
+      - name: Download Setup EXE
+        uses: actions/download-artifact@v4
+        with:
+          name: AISearchEngine-Windows-CUDA-Setup
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -84,4 +173,5 @@ jobs:
           name: AISearchEngine Build ${{ github.run_number }}
           files: |
             AISearchEngine-CPU.zip
-            AISearchEngine-CUDA.zip
+            AISearchEngine-CUDA.7z.*
+            AISearchEngine-CUDA-Setup.exe
