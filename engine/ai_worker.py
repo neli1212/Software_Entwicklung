@@ -3,6 +3,13 @@ import torch.nn.functional as F
 from PIL import Image
 from PySide6.QtCore import QThread, Signal
 from transformers import BlipProcessor, BlipForConditionalGeneration, BlipForImageTextRetrieval
+from transformers import logging as transformers_logging
+
+transformers_logging.set_verbosity_error()
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+if sys.platform == "win32":
+    sys.stdout.reconfigure(line_buffering=True)
 
 _GLOBAL_ENGINE = {"processor": None, "model_gen": None, "model_ret": None, "current_model": None}
 _ENGINE_LOCK = threading.Lock() 
