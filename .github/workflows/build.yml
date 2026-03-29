@@ -18,7 +18,7 @@ jobs:
       - name: Install Dependencies (CPU)
         run: |
           python -m pip install --upgrade pip
-          pip install torch torchvision
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install transformers pillow opencv-python PySide6 pyinstaller
 
       - name: Build CPU EXE
@@ -55,12 +55,13 @@ jobs:
         run: pyinstaller --noconfirm --onedir --windowed --name AISearchEngine-CUDA --collect-all torch --collect-all transformers --collect-all huggingface_hub --collect-all cv2 main.py
 
       - name: Create Inno Setup Script
+        shell: powershell
         run: |
           $iss = @"
           [Setup]
           AppName=AISearchEngine CUDA
           AppVersion=1.0
-          DefaultDirName={userlocalappdata}\AISearchEngine
+          DefaultDirName={localappdata}\AISearchEngine
           PrivilegesRequired=lowest
           OutputDir=InstallerOutput
           OutputBaseFilename=AISearchEngine-CUDA-Setup
@@ -75,7 +76,7 @@ jobs:
           [Icons]
           Name: "{userprograms}\AISearchEngine"; Filename: "{app}\AISearchEngine-CUDA.exe"
           "@
-          Set-Content -Path "installer.iss" -Value $iss
+          Set-Content -Path "installer.iss" -Value $iss -Encoding UTF8
 
       - name: Compile Installer
         run: |
