@@ -34,7 +34,7 @@ jobs:
           name: AISearchEngine-Windows-CPU
           path: AISearchEngine-CPU.zip
 
-  # ---------- CUDA‑Build & Aufteilen ----------
+  # ---------- CUDA‑Build & Aufteilen (sichere Teilgröße) ----------
   build-cuda:
     runs-on: windows-latest
     steps:
@@ -58,9 +58,9 @@ jobs:
       - name: Zip CUDA Build
         run: 7z a AISearchEngine-CUDA.zip ./dist/AISearchEngine-CUDA/*
 
-      - name: Split CUDA ZIP into ≤2 GB parts
+      - name: Split CUDA ZIP into ≤1.9 GB parts
         run: |
-          7z a -v2g AISearchEngine-CUDA.7z AISearchEngine-CUDA.zip
+          7z a -v1990m AISearchEngine-CUDA.7z AISearchEngine-CUDA.zip
           del AISearchEngine-CUDA.zip
           # Erzeugt: AISearchEngine-CUDA.7z.001, .002, ...
 
