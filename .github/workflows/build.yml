@@ -1,9 +1,11 @@
 name: Build Windows EXE
 
-on: [push]
+on:
+  push:
+    branches:
+      - main
 
 jobs:
-  # ---------- CPU-Build ----------
   build-cpu:
     runs-on: windows-latest
     steps:
@@ -33,7 +35,6 @@ jobs:
           name: AISearchEngine-Windows-CPU
           path: AISearchEngine-CPU.zip
 
-  # ---------- CUDA-Build & Installer ----------
   build-cuda:
     runs-on: windows-latest
     steps:
@@ -61,8 +62,9 @@ jobs:
           [Setup]
           AppName=AISearchEngine CUDA
           AppVersion=1.0
-          DefaultDirName={localappdata}\AISearchEngine
-          PrivilegesRequired=lowest
+          DefaultDirName={autopf}\AISearchEngine
+          DefaultGroupName=AISearchEngine
+          PrivilegesRequired=admin
           OutputDir=InstallerOutput
           OutputBaseFilename=AISearchEngine-CUDA-Setup
           Compression=lzma2/ultra64
@@ -74,7 +76,8 @@ jobs:
           Source: "dist\AISearchEngine-CUDA\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
           [Icons]
-          Name: "{userprograms}\AISearchEngine"; Filename: "{app}\AISearchEngine-CUDA.exe"
+          Name: "{group}\AISearchEngine"; Filename: "{app}\AISearchEngine-CUDA.exe"
+          Name: "{commondesktop}\AISearchEngine"; Filename: "{app}\AISearchEngine-CUDA.exe"
           "@
           Set-Content -Path "installer.iss" -Value $iss -Encoding UTF8
 
@@ -88,10 +91,9 @@ jobs:
           name: AISearchEngine-Windows-CUDA-Installer
           path: InstallerOutput\*
 
-  # ---------- Release ----------
   release:
     needs: [build-cpu, build-cuda]
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     permissions:
       contents: write 
     steps:
@@ -99,18 +101,19 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: AISearchEngine-Windows-CPU
-          path: release-files
 
       - name: Download CUDA Installer
         uses: actions/download-artifact@v4
         with:
           name: AISearchEngine-Windows-CUDA-Installer
-          path: release-files
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           token: ${{ secrets.GH_PAT }}
-          tag_name: build-${{ github.run_number }}
+          tag_name: v1.0.${{ github.run_number }}
           name: AISearchEngine Build ${{ github.run_number }}
-          files: release-files/*
+          files: |
+            AISearchEngine-CPU.zip
+            AISearchEngine-CUDA-Setup.exe
+            AISearchEngine-CUDA-Setup-1.bin
