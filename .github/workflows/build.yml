@@ -3,8 +3,7 @@ name: Build Windows EXE
 on: [push]
 
 jobs:
-
-  # ---------- CPU‑Build ----------
+  # ---------- CPU-Build ----------
   build-cpu:
     runs-on: windows-latest
     steps:
@@ -34,7 +33,7 @@ jobs:
           name: AISearchEngine-Windows-CPU
           path: AISearchEngine-CPU.zip
 
-  # ---------- CUDA‑Build & Aufteilen (sichere Teilgröße) ----------
+  # ---------- CUDA-Build & Installer ----------
   build-cuda:
     runs-on: windows-latest
     steps:
@@ -55,115 +54,57 @@ jobs:
       - name: Build CUDA EXE
         run: pyinstaller --noconfirm --onedir --windowed --name AISearchEngine-CUDA --collect-all torch --collect-all transformers --collect-all huggingface_hub --collect-all cv2 main.py
 
-      - name: Zip CUDA Build
-        run: 7z a AISearchEngine-CUDA.zip ./dist/AISearchEngine-CUDA/*
-
-      - name: Split CUDA ZIP into ≤1.9 GB parts
+      - name: Create Inno Setup Script
         run: |
-          7z a -v1990m AISearchEngine-CUDA.7z AISearchEngine-CUDA.zip
-          del AISearchEngine-CUDA.zip
-          # Erzeugt: AISearchEngine-CUDA.7z.001, .002, ...
+          $iss = @"
+          [Setup]
+          AppName=AISearchEngine CUDA
+          AppVersion=1.0
+          DefaultDirName={userlocalappdata}\AISearchEngine
+          PrivilegesRequired=lowest
+          OutputDir=InstallerOutput
+          OutputBaseFilename=AISearchEngine-CUDA-Setup
+          Compression=lzma2/ultra64
+          SolidCompression=yes
+          DiskSpanning=yes
+          DiskSliceSize=1900000000
 
-      - name: Upload split parts as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: AISearchEngine-Windows-CUDA
-          path: AISearchEngine-CUDA.7z.*
+          [Files]
+          Source: "dist\AISearchEngine-CUDA\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
-  # ---------- Setup‑Installer (selbstextrahierende EXE) ----------
-  create-setup:
-    needs: [build-cuda]
-    runs-on: windows-latest
-    steps:
-      - name: Download split parts
-        uses: actions/download-artifact@v4
-        with:
-          name: AISearchEngine-Windows-CUDA
-
-      - name: Generate download script (batch)
-        run: |
-          $tag = "${{ github.ref_name }}"
-          $repo = "${{ github.repository }}"
-          $parts = Get-ChildItem -Name "AISearchEngine-CUDA.7z.*"
-          $urls = $parts | ForEach-Object { "https://github.com/${repo}/releases/download/${tag}/$_" }
-          $urlList = $urls -join "`n"
-
-          @"
-          @echo off
-          echo Downloading CUDA parts from GitHub...
-          setlocal enabledelayedexpansion
-          for /f "usebackq delims=" %%u in (`echo "$urlList"`) do (
-            echo Downloading %%u
-            curl -L -O "%%u"
-          )
-          echo Merging parts...
-          copy /b AISearchEngine-CUDA.7z.* AISearchEngine-CUDA.7z
-          echo Extracting...
-          7z x AISearchEngine-CUDA.7z -y
-          echo Cleanup...
-          del AISearchEngine-CUDA.7z.* AISearchEngine-CUDA.7z
-          echo Done. Press any key to exit.
-          pause >nul
-          "@ > "AISearchEngine-CUDA-Setup.bat"
-
-      - name: Convert batch to silent EXE (IExpress)
-        run: |
-          $sed = @"
-          [Version]
-          Class=IEXPRESS
-          SEDVersion=3
-          [Options]
-          PackagePurpose=InstallApp
-          ShowInstallProgramWindow=1
-          HideExtractAnimation=1
-          UseLongFileName=1
-          InsideCompressed=0
-          CAB_FixedSize=0
-          CAB_ResvCodeSigning=0
-          RebootMode=N
-          InstallPrompt=
-          DisplayLicense=
-          FinishMessage=Fertig.
-          TargetName=AISearchEngine-CUDA-Setup.exe
-          FriendlyName=AISearchEngine CUDA Setup
-          AppLaunched=AISearchEngine-CUDA-Setup.bat
-          PostInstallCmd=
-          AdminQuietInstCmd=
-          UserQuietInstCmd=
-          SourceFiles=SourceFiles
-          [SourceFiles]
-          SourceFiles0=.
-          [SourceFiles0]
-          AISearchEngine-CUDA-Setup.bat=
+          [Icons]
+          Name: "{userprograms}\AISearchEngine"; Filename: "{app}\AISearchEngine-CUDA.exe"
           "@
-          $sed | Out-File -Encoding ascii setup.sed
-          iexpress /n setup.sed
+          Set-Content -Path "installer.iss" -Value $iss
 
-      - name: Upload Setup EXE as artifact
+      - name: Compile Installer
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\iscc.exe" installer.iss
+
+      - name: Upload Installer Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: AISearchEngine-Windows-CUDA-Setup
-          path: AISearchEngine-CUDA-Setup.exe
+          name: AISearchEngine-Windows-CUDA-Installer
+          path: InstallerOutput\*
 
   # ---------- Release ----------
   release:
-    needs: [build-cpu, create-setup]
+    needs: [build-cpu, build-cuda]
     runs-on: windows-latest
+    permissions:
+      contents: write 
     steps:
       - name: Download CPU artifact
         uses: actions/download-artifact@v4
         with:
           name: AISearchEngine-Windows-CPU
+          path: release-files
 
-      - name: Download CUDA split parts
+      - name: Download CUDA Installer
         uses: actions/download-artifact@v4
         with:
-          name: AISearchEngine-Windows-CUDA
-
-      - name: Download Setup EXE
-        uses: actions/download-artifact@v4
-        with:
-          name: AISearchEngine-Windows-CUDA-Setup
+          name: AISearchEngine-Windows-CUDA-Installer
+          path: release-files
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -171,7 +112,4 @@ jobs:
           token: ${{ secrets.GH_PAT }}
           tag_name: build-${{ github.run_number }}
           name: AISearchEngine Build ${{ github.run_number }}
-          files: |
-            AISearchEngine-CPU.zip
-            AISearchEngine-CUDA.7z.*
-            AISearchEngine-CUDA-Setup.exe
+          files: release-files/*
