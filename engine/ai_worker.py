@@ -105,19 +105,59 @@ def get_engine_safe(device_string, model_key):
     return _GLOBAL_ENGINE["processor"], _GLOBAL_ENGINE["model_gen"], _GLOBAL_ENGINE["model_ret"]
 
 class ModelLoader(QThread):
-    finished = Signal()
-    def __init__(self, model_key):
+    progress = Signal(int, str)
+    finished = Signal(bool, str)
+
+    def __init__(self, model_name):
         super().__init__()
-        self.target_dev = "cuda" if torch.cuda.is_available() else "cpu"
-        self.model_key = model_key
+        self.model_name = model_name
 
     def run(self):
         try:
-            get_engine_safe(self.target_dev, self.model_key)
+            import time
+            import os
+            from transformers import BlipProcessor, BlipForConditionalGeneration, BlipForImageTextRetrieval
+            
+            os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
+            
+            model_id = AVAILABLE_MODELS.get(self.model_name, self.model_name)
+            model_path = get_model_path()
+            
+            self.progress.emit(10, f"Initializing download for {self.model_name}...")
+            
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    self.progress.emit(20 + (attempt * 10), f"Downloading processor (Attempt {attempt + 1}/{max_retries})...")
+                    proc = BlipProcessor.from_pretrained(model_id, cache_dir=model_path)
+                    
+                    self.progress.emit(50 + (attempt * 10), f"Downloading generation model (Attempt {attempt + 1}/{max_retries})...")
+                    model_gen = BlipForConditionalGeneration.from_pretrained(model_id, cache_dir=model_path)
+                    
+                    self.progress.emit(70 + (attempt * 10), f"Downloading retrieval model (Attempt {attempt + 1}/{max_retries})...")
+                    model_ret = BlipForImageTextRetrieval.from_pretrained(model_id, cache_dir=model_path)
+                    
+                    # Break the loop if all models downloaded successfully
+                    break
+                except Exception as network_error:
+                    if attempt < max_retries - 1:
+                        self.progress.emit(30, f"Network interrupted. Retrying in 5 seconds...")
+                        time.sleep(5)
+                    else:
+                        raise network_error
+
+            # Lock and load to the global engine
+            with _ENGINE_LOCK:
+                _GLOBAL_ENGINE["processor"] = proc
+                _GLOBAL_ENGINE["model_gen"] = model_gen
+                _GLOBAL_ENGINE["model_ret"] = model_ret
+                _GLOBAL_ENGINE["current_model"] = self.model_name
+                
+            self.progress.emit(100, "Model loaded successfully.")
+            self.finished.emit(True, "Success")
+            
         except Exception as e:
-            print(f"[LOADER ERROR]: {e}")
-        finally:
-            self.finished.emit()
+            self.finished.emit(False, f"Error loading model: {str(e)}")
 
 class AIWorker(QThread):
     progress_update = Signal(int, str)
