@@ -11,24 +11,19 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-
-      - name: Install Dependencies (CPU)
+      - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install "torch>=2.6.0" "torchvision>=0.21.0" --index-url https://download.pytorch.org/whl/cpu
+          pip install "torch>=2.6.0" torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install transformers pillow opencv-python PySide6 pyinstaller
-
       - name: Build CPU EXE
         run: pyinstaller --noconfirm --onedir --windowed --name AISearchEngine-CPU --collect-all torch --collect-all transformers --collect-all huggingface_hub --collect-all cv2 main.py
-
       - name: Zip CPU Build
         run: 7z a AISearchEngine-CPU.zip ./dist/AISearchEngine-CPU/*
-
       - name: Upload CPU Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -40,21 +35,17 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-
-      - name: Install Dependencies (CUDA)
+      - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install "torch>=2.6.0" "torchvision>=0.21.0" "torchaudio>=2.6.0" --index-url https://download.pytorch.org/whl/cu124
+          pip install "torch>=2.6.0" torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
           pip install transformers pillow opencv-python PySide6 pyinstaller
-
       - name: Build CUDA EXE
         run: pyinstaller --noconfirm --onedir --windowed --name AISearchEngine-CUDA --collect-all torch --collect-all transformers --collect-all huggingface_hub --collect-all cv2 main.py
-
       - name: Create Installer Script
         run: |
           $iss = @"
@@ -62,12 +53,10 @@ jobs:
           AppName="AISearchEngine"
           AppVersion="1.0"
           DefaultDirName="{autopf}\AISearchEngine"
-          DefaultGroupName="AISearchEngine"
           OutputDir="InstallerOutput"
-          OutputBaseFilename="AISearchEngine-Installer"
+          OutputBaseFilename="AISearchEngine-CUDA-Setup"
           Compression=lzma
           SolidCompression=yes
-          ArchitecturesInstallIn64BitMode=x64
 
           [Dirs]
           Name: "{app}\ai_models"; Permissions: users-modify
@@ -80,12 +69,9 @@ jobs:
           Name: "{commondesktop}\AISearchEngine"; Filename: "{app}\AISearchEngine-CUDA.exe"
           "@
           Set-Content -Path "installer.iss" -Value $iss -Encoding UTF8
-
       - name: Compile Installer
-        run: |
-          & "C:\Program Files (x86)\Inno Setup 6\iscc.exe" installer.iss
-
-      - name: Upload Installer Artifacts
+        run: & "C:\Program Files (x86)\Inno Setup 6\iscc.exe" installer.iss
+      - name: Upload CUDA Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: AISearchEngine-Windows-CUDA-Installer
@@ -101,12 +87,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: AISearchEngine-Windows-CPU
-
       - name: Download CUDA Installer
         uses: actions/download-artifact@v4
         with:
           name: AISearchEngine-Windows-CUDA-Installer
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -115,4 +99,5 @@ jobs:
           name: AISearchEngine Build ${{ github.run_number }}
           files: |
             AISearchEngine-CPU.zip
-            InstallerOutput/AISearchEngine-Installer.exe
+            AISearchEngine-CUDA-Setup.exe
+            AISearchEngine-CUDA-Setup-1.bin
