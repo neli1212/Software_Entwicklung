@@ -20,7 +20,7 @@ jobs:
       - name: Install Dependencies (CPU)
         run: |
           python -m pip install --upgrade pip
-          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install "torch>=2.6.0" "torchvision>=0.21.0" --index-url https://download.pytorch.org/whl/cpu
           pip install transformers pillow opencv-python PySide6 pyinstaller
 
       - name: Build CPU EXE
@@ -49,28 +49,28 @@ jobs:
       - name: Install Dependencies (CUDA)
         run: |
           python -m pip install --upgrade pip
+          pip install "torch>=2.6.0" "torchvision>=0.21.0" "torchaudio>=2.6.0" --index-url https://download.pytorch.org/whl/cu124
           pip install transformers pillow opencv-python PySide6 pyinstaller
-          pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
 
       - name: Build CUDA EXE
         run: pyinstaller --noconfirm --onedir --windowed --name AISearchEngine-CUDA --collect-all torch --collect-all transformers --collect-all huggingface_hub --collect-all cv2 main.py
 
-      - name: Create Inno Setup Script
-        shell: powershell
+      - name: Create Installer Script
         run: |
           $iss = @"
           [Setup]
-          AppName=AISearchEngine CUDA
-          AppVersion=1.0
-          DefaultDirName={autopf}\AISearchEngine
-          DefaultGroupName=AISearchEngine
-          PrivilegesRequired=admin
-          OutputDir=InstallerOutput
-          OutputBaseFilename=AISearchEngine-CUDA-Setup
-          Compression=lzma2/ultra64
+          AppName="AISearchEngine"
+          AppVersion="1.0"
+          DefaultDirName="{autopf}\AISearchEngine"
+          DefaultGroupName="AISearchEngine"
+          OutputDir="InstallerOutput"
+          OutputBaseFilename="AISearchEngine-Installer"
+          Compression=lzma
           SolidCompression=yes
-          DiskSpanning=yes
-          DiskSliceSize=1900000000
+          ArchitecturesInstallIn64BitMode=x64
+
+          [Dirs]
+          Name: "{app}\ai_models"; Permissions: users-modify
 
           [Files]
           Source: "dist\AISearchEngine-CUDA\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -115,5 +115,4 @@ jobs:
           name: AISearchEngine Build ${{ github.run_number }}
           files: |
             AISearchEngine-CPU.zip
-            AISearchEngine-CUDA-Setup.exe
-            AISearchEngine-CUDA-Setup-1.bin
+            InstallerOutput/AISearchEngine-Installer.exe
