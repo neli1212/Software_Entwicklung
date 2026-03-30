@@ -99,4 +99,4 @@ jobs:
           name: AISearchEngine Build ${{ github.run_number }}
           files: |
             AISearchEngine-CPU.zip
-            InstallerOutput/AISearchEngine_CUDA_Setup.exe
+            AISearchEngine_CUDA_Setup.exe
