@@ -42,7 +42,7 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install "torch>=2.6.0" torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+          pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu124
           pip install transformers pillow opencv-python PySide6 pyinstaller
       - name: Build CUDA EXE
         run: pyinstaller --noconfirm --onedir --windowed --name AISearchEngine-CUDA --collect-all torch --collect-all transformers --collect-all huggingface_hub --collect-all cv2 main.py
