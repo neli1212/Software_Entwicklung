@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap, QColor
 from engine.ai_worker import AIWorker, ModelLoader, AVAILABLE_MODELS, check_model_downloaded, delete_local_model
-from ui.widgets import UniversalCard
+from ui.widgets import UniversalCard, SmartDropZone
 from engine.processor import collect_all_media
 from PySide6.QtCore import QTimer
 
@@ -43,95 +43,6 @@ LIGHT_THEME = """
     QProgressBar { border: 2px solid #ccc; border-radius: 5px; text-align: center; }
     QProgressBar::chunk { background-color: #005fb8; width: 20px; }
 """
-
-class SmartDropZone(QFrame):
-    filesDropped = Signal(list)
-    cleared = Signal()
-
-    def __init__(self, title="Drop Files", color="#3d94ff", multi=False):
-        super().__init__()
-        self.setAcceptDrops(True)
-        self.setMinimumHeight(120)
-        self.color, self.title, self.multi = color, title, multi
-        self.all_paths = [] 
-        self.is_dark = True
-        
-        self.layout = QVBoxLayout(self)
-        self.label = QLabel(f"{self.title}\n(or click)")
-        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.label.setStyleSheet("border: none; background: transparent;")
-        self.layout.addWidget(self.label)
-
-        self.btn_x = QPushButton("✕", self)
-        self.btn_x.setFixedSize(20, 20)
-        self.btn_x.setStyleSheet("background: #d32f2f; color: white; border-radius: 10px; font-weight: bold; border: none;")
-        self.btn_x.hide()
-        self.btn_x.clicked.connect(self.clear)
-        self.update_style()
-
-    def update_theme(self, is_dark):
-        self.is_dark = is_dark
-        self.update_style()
-
-    def update_style(self, highlight=False):
-        if highlight:
-            border_col = self.color
-            bg_col = "#2a2a2a" if self.is_dark else "#e3f2fd"
-        else:
-            border_col = "#444" if self.is_dark else "#ccc"
-            bg_col = "#1a1a1a" if self.is_dark else "#ffffff"
-        
-        text_col = "#888" if self.is_dark else "#555"
-        
-        self.setStyleSheet(f"QFrame {{ border: 2px dashed {border_col}; border-radius: 8px; background-color: {bg_col}; }}")
-        self.label.setStyleSheet(f"color: {text_col}; font-size: 11px; border: none; background: transparent;")
-
-    def resizeEvent(self, event):
-        self.btn_x.move(self.width() - 25, 5)
-        super().resizeEvent(event)
-
-    def trigger_browse(self, is_folder=False):
-        if is_folder:
-            path = QFileDialog.getExistingDirectory(self, "Select Folder")
-            files = [path] if path else []
-        elif self.multi:
-            files, _ = QFileDialog.getOpenFileNames(self, "Select Media", "", "Media (*.png *.jpg *.jpeg *.mp4 *.avi *.mov *.mkv)")
-        else:
-            file, _ = QFileDialog.getOpenFileName(self, "Select Image", "", "Images (*.png *.jpg *.jpeg)")
-            files = [file] if file else []
-        if files: self.add_paths(files)
-
-    def add_paths(self, new_paths):
-        if not self.multi:
-            self.all_paths = [new_paths[0]]
-            pixmap = QPixmap(new_paths[0])
-            if not pixmap.isNull():
-                self.label.setPixmap(pixmap.scaled(self.width()-20, self.height()-20, Qt.AspectRatioMode.KeepAspectRatio))
-                self.label.setText("")
-                self.btn_x.show()
-        else:
-            for p in new_paths:
-                if p not in self.all_paths: self.all_paths.append(p)
-            self.label.setText(f"{len(self.all_paths)} files queued")
-            self.btn_x.show()
-        self.filesDropped.emit(self.all_paths)
-
-    def clear(self):
-        self.all_paths = []
-        self.label.setPixmap(QPixmap())
-        self.label.setText(f"{self.title}\n(or click)")
-        self.btn_x.hide()
-        self.cleared.emit()
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton: self.trigger_browse()
-    def dragEnterEvent(self, event):
-        if event.mimeData().hasUrls(): self.update_style(True); event.accept()
-    def dragLeaveEvent(self, event): self.update_style(False)
-    def dropEvent(self, event):
-        self.update_style(False)
-        urls = event.mimeData().urls()
-        if urls: self.add_paths([u.toLocalFile() for u in urls])
 
 class MainWindow(QMainWindow):
     def __init__(self):

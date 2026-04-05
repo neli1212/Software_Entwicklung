@@ -1,6 +1,6 @@
 import cv2
 import os
-from PySide6.QtWidgets import QFrame, QVBoxLayout, QLabel, QHBoxLayout, QFileDialog, QSizePolicy
+from PySide6.QtWidgets import QFrame, QVBoxLayout, QLabel, QHBoxLayout, QFileDialog, QSizePolicy, QPushButton
 from PySide6.QtGui import QPixmap, QImage, QColor, QDragEnterEvent, QDropEvent
 from PySide6.QtCore import Qt, Signal
 
@@ -25,85 +25,90 @@ class SmartDropZone(QFrame):
     filesDropped = Signal(list)
     cleared = Signal()
 
-    def __init__(self, text, color, multi):
+    def __init__(self, title="Drop Files", color="#3d94ff", multi=False):
         super().__init__()
         self.setAcceptDrops(True)
         self.setMinimumHeight(120)
-        self.multi = multi
-        self.base_color = color
+        self.color, self.title, self.multi = color, title, multi
+        self.all_paths = [] 
         self.is_dark = True
-        self.all_paths = []
-
-        layout = QVBoxLayout(self)
-        self.lbl_text = QLabel(text)
-        self.lbl_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.lbl_text)
-
-        self.update_theme(self.is_dark)
-
-    def dragEnterEvent(self, event: QDragEnterEvent):
-        if event.mimeData().hasUrls():
-            event.accept()
-            self.setStyleSheet(f"QFrame {{ border: 2px dashed {self.base_color}; background-color: rgba(61, 148, 255, 0.2); border-radius: 10px; }}")
-        else:
-            event.ignore()
-
-    def dragLeaveEvent(self, event):
-        self.update_theme(self.is_dark)
-
-    def dropEvent(self, event: QDropEvent):
-        paths = [url.toLocalFile() for url in event.mimeData().urls()]
-        self.add_paths(paths)
-        self.update_theme(self.is_dark)
-
-    def trigger_browse(self, is_folder):
-        if is_folder:
-            folder = QFileDialog.getExistingDirectory(self, "Select Folder")
-            if folder:
-                paths = []
-                for root, dirs, files in os.walk(folder):
-                    for f in files:
-                        paths.append(os.path.join(root, f))
-                self.add_paths(paths)
-        else:
-            files, _ = QFileDialog.getOpenFileNames(self, "Select Files")
-            if files:
-                self.add_paths(files)
-
-    def add_paths(self, new_paths):
-        """Fügt neue Pfade hinzu und blockiert Duplikate strikt."""
-        added_count = 0
         
-        if not hasattr(self, 'all_paths'):
-            self.all_paths = []
+        self.layout = QVBoxLayout(self)
+        self.label = QLabel(f"{self.title}\n(or click)")
+        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.label.setStyleSheet("border: none; background: transparent;")
+        self.layout.addWidget(self.label)
 
-        for path in new_paths:
-            norm_path = os.path.normpath(path)
-            if norm_path not in self.all_paths:
-                self.all_paths.append(norm_path)
-                added_count += 1
-
-        if self.all_paths:
-            if self.multi:
-                self.lbl_text.setText(f"{len(self.all_paths)} unique files loaded")
-            else:
-                self.lbl_text.setText(os.path.basename(self.all_paths[-1]))
-        
-        if added_count > 0:
-            self.filesDropped.emit(self.all_paths)
-
-    def clear(self):
-        self.all_paths.clear()
-        self.lbl_text.setText("Cleared")
-        self.cleared.emit()
+        self.btn_x = QPushButton("✕", self)
+        self.btn_x.setFixedSize(20, 20)
+        self.btn_x.setStyleSheet("background: #d32f2f; color: white; border-radius: 10px; font-weight: bold; border: none;")
+        self.btn_x.hide()
+        self.btn_x.clicked.connect(self.clear)
+        self.update_style()
 
     def update_theme(self, is_dark):
         self.is_dark = is_dark
-        bg = "#1e1e1e" if is_dark else "#f0f0f0"
-        border = "#444" if is_dark else "#ccc"
-        text_color = "white" if is_dark else "black"
-        self.setStyleSheet(f"QFrame {{ border: 2px dashed {border}; background-color: {bg}; border-radius: 10px; }}")
-        self.lbl_text.setStyleSheet(f"color: {text_color}; font-weight: bold;")
+        self.update_style()
+
+    def update_style(self, highlight=False):
+        if highlight:
+            border_col = self.color
+            bg_col = "#2a2a2a" if self.is_dark else "#e3f2fd"
+        else:
+            border_col = "#444" if self.is_dark else "#ccc"
+            bg_col = "#1a1a1a" if self.is_dark else "#ffffff"
+        
+        text_col = "#888" if self.is_dark else "#555"
+        
+        self.setStyleSheet(f"QFrame {{ border: 2px dashed {border_col}; border-radius: 8px; background-color: {bg_col}; }}")
+        self.label.setStyleSheet(f"color: {text_col}; font-size: 11px; border: none; background: transparent;")
+
+    def resizeEvent(self, event):
+        self.btn_x.move(self.width() - 25, 5)
+        super().resizeEvent(event)
+
+    def trigger_browse(self, is_folder=False):
+        if is_folder:
+            path = QFileDialog.getExistingDirectory(self, "Select Folder")
+            files = [path] if path else []
+        elif self.multi:
+            files, _ = QFileDialog.getOpenFileNames(self, "Select Media", "", "Media (*.png *.jpg *.jpeg *.mp4 *.avi *.mov *.mkv)")
+        else:
+            file, _ = QFileDialog.getOpenFileName(self, "Select Image", "", "Images (*.png *.jpg *.jpeg)")
+            files = [file] if file else []
+        if files: self.add_paths(files)
+
+    def add_paths(self, new_paths):
+        if not self.multi:
+            self.all_paths = [new_paths[0]]
+            pixmap = QPixmap(new_paths[0])
+            if not pixmap.isNull():
+                self.label.setPixmap(pixmap.scaled(self.width()-20, self.height()-20, Qt.AspectRatioMode.KeepAspectRatio))
+                self.label.setText("")
+                self.btn_x.show()
+        else:
+            for p in new_paths:
+                if p not in self.all_paths: self.all_paths.append(p)
+            self.label.setText(f"{len(self.all_paths)} files queued")
+            self.btn_x.show()
+        self.filesDropped.emit(self.all_paths)
+
+    def clear(self):
+        self.all_paths = []
+        self.label.setPixmap(QPixmap())
+        self.label.setText(f"{self.title}\n(or click)")
+        self.btn_x.hide()
+        self.cleared.emit()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton: self.trigger_browse()
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls(): self.update_style(True); event.accept()
+    def dragLeaveEvent(self, event): self.update_style(False)
+    def dropEvent(self, event):
+        self.update_style(False)
+        urls = event.mimeData().urls()
+        if urls: self.add_paths([u.toLocalFile() for u in urls])
 
 
 class UniversalCard(QFrame):

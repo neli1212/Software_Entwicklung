@@ -2,8 +2,14 @@
 
 Diese Anwendung soll die inhaltliche Durchsuchung lokaler Bild und Videodateien per Text-Prompt oder Referenzbild ermöglichen. Durch lokale Modelle findet der gesamte Abgleich auf der eigenen GPU/CPU statt, wodurch die Daten privat bleiben und keine Cloud-Anbindung nötig ist.
 
-Die ausführbare compilierte exe ist in GitHub unter dem Release Tab  herunter zu laden für entweder (falls cudafhige GPU vorhanden) CUDA oder CPU.
+Die kompilierte .exe ist auf GitHub unter **Releases** im Abschnitt **Erarbeitungs- und Reflexionsphase** zu finden. Es gibt zwei Varianten: eine ohne CUDA (CPU) und eine mit CUDA. Funktional sind beide identisch, jedoch kann die CUDA-Version die GPU nutzen und ist dadurch deutlich schneller. Da CUDA zu groß für GitHub ist, kann es nicht direkt in die kompilierte Datei integriert werden. Deshalb muss bei der CUDA-Version zuerst die mitgelieferte Setup-Datei für CUDA ausgeführt werden. Bei der Version ohne CUDA reicht es aus, das Archiv zu entpacken und die .exe zu starten.
 
+Beim ersten Start muss das Programm mindestens ein Modell herunterladen und speichern. Dafür benötigt es Schreibrechte auf seinen eigenen Ordner. Falls diese nicht vorhanden sind, müssen sie gegeben werden, zum Beispiel indem die .exe als Administrator ausgeführt wird oder indem dem Ordner Schreibrechte gegeben werden. Wenn sich die Anwendung z. B. in „C:\Program Files\AISearchEngine“ befindet, kann dies über PowerShell (als Administrator) mit folgendem Befehl erfolgen:
+
+
+```bash
+icacls "C:\Program Files\AISearchEngine" /grant *S-1-5-32-545:(OI)(CI)M
+```
 
 # Eingabe
 
@@ -14,9 +20,9 @@ Unter **Target Data** sind die zu durchsuchenden Dateien bzw. Ordner einzufügen
 
 # Suche
 
-Unter **AI Settings** kann man den Suchmodus einstellen. Entweder wird nach Keywords in den generierten AI-Prompts gesucht oder es werden die beiden Vektoren der Eingabe (Text oder Bild) und der zu durchsuchenden Dateien miteinander verglichen.
+Unter **AI Settings** kann man unter **Comparison Logic** den Suchmodus einstellen. Entweder wird nach Keywords in den generierten AI-Prompts gesucht oder es werden die beiden Vektoren der Eingabe (Text oder Bild) und der zu durchsuchenden Dateien miteinander verglichen.
 
-Aktuell kann man zwischen zwei Modellen auswählen, die sich hauptsächlich in ihrer Größe unterscheiden.
+Aktuell kann in **KI-Modeel Version** zwischen zwei Modellen auswählen, die sich hauptsächlich in ihrer Größe unterscheiden.
 
 Zusätzlich kann man die Generierung der Prompts über einige Parameter beeinflussen:
 
